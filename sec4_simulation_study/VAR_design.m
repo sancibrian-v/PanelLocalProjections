@@ -5,7 +5,7 @@
 %
 % The confidence intervals and DGP are discussed in Section 4 and in the
 % Supplemental Appendix C of "Micro Responses to Macro Shocks" 
-% M. Almuzara and V. Sancibrian.
+% by M. Almuzara and V. Sancibrian.
 %
 % The code creates output directories for figures, matfiles and tables. It
 % runs in parallel using 100 workers (see line 284).
