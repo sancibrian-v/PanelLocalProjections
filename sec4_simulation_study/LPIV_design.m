@@ -22,7 +22,7 @@ end
 fig_dir = [fig_dir main_name filesep];
 
 % Determine tasks
-run_simulation = false;
+run_simulation = true;
 create_figures = true;
 set(0, 'DefaultFigureVisible', 'off')
 
