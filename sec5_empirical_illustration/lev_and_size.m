@@ -22,7 +22,7 @@ clc
 main_name = 'lev_and_size';
 
 % Set up directories
-addpath('functions');
+addpath('functions')
 data_dir = ['indata' filesep];
 fig_dir  = ['output' filesep 'figures' filesep];
 mat_dir  = ['output' filesep 'matfiles' filesep];
