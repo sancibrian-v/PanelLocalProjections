@@ -18,7 +18,7 @@ clear
 close all
 clc
 
-% Set filenamese
+% Set filenames
 main_name = 'lev_and_size';
 
 % Set up directories
