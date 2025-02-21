@@ -1,7 +1,7 @@
 # PanelLocalProjections
 This repository contains files to implement panel local projections estimation and inference.
 
-Reference: [Almuzara Martin]([url](https://martinalmuzara.com/research.html)) and [Victor Sancibrian]([url](https://sancibrian-v.github.io)), 2024: “[Micro Responses to Macro Shocks.]([url](https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr1090.pdf))” Federal Reserve Bank of New York Staff Report, no. 1090.
+Reference: [Almuzara Martin](https://martinalmuzara.com/research.html) and [Victor Sancibrian](https://sancibrian-v.github.io), 2024: “[Micro Responses to Macro Shocks.](https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr1090.pdf)” Federal Reserve Bank of New York Staff Report, no. 1090.
 
 The **matlab_package** directory contains Matlab code:
   - The main function is **LP_panel.m**
