@@ -1,4 +1,4 @@
-%%% EXAMPLE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% USAGE EXAMPLE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This script illustrates the usage of panel_LP, the function to implement
 % estimation and inference as recommended in "Micro Responses to Macro Shocks" 
 % by M. Almuzara and V. Sancibrian.
