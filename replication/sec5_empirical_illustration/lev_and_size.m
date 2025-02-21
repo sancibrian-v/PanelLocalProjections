@@ -6,9 +6,9 @@
 % Results are reported in Section 5 of "Micro Responses to Macro Shocks" 
 % by M. Almuzara and V. Sancibrian.
 %
-% The code takes as input a csv-file created by combining Compustat data 
-% with other sources following Ottonello and Winberry (2020, ECTA). It 
-% creates output directories for figures and matfiles.
+% The code takes as input a csv-file created by combining Compustat and CRSP 
+% data with other sources following Ottonello and Winberry (2020, ECTA).
+% It creates output directories for figures and matfiles.
 %
 % Version: 2024 June 10 - Matlab R2022a
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
