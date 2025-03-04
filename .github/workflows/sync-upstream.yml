@@ -29,6 +29,6 @@ jobs:
         git merge upstream/main --allow-unrelated-histories
 
     - name: Push Changes to Fork
-      run: git push origin main
+      run: git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/sancibrian-v/PanelLocalProjections.git main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
