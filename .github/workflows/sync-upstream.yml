@@ -1,0 +1,34 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+
+    - name: Set Up Git
+      run: |
+        git config user.name "sancibrian-v"
+        git config user.email "sancibrian.v@gmail.com"
+
+    - name: Add Upstream Repo
+      run: git remote add upstream https://github.com/TinchoAlmuzara/PanelLocalProjections
+
+    - name: Fetch and Merge Upstream
+      run: |
+        git fetch upstream
+        git checkout main
+        git merge upstream/main
+
+    - name: Push Changes to Fork
+      run: git push origin main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
