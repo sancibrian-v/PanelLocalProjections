@@ -478,7 +478,11 @@ parfor i_MC = 1:n_MC
             SE_LP_mean_par(h+1, 5) = sqrt(max(0, b_var(1)));
             df_LP_mean_par(h+1, 5) = Inf;
         else
-            X_t    = reshape( mean(reshape(X, [T_est, N, n_X]), 2), [T_est, n_X]);
+            X_tmp  = reshape(X, [T_est, N, n_X]);
+            X_t    = NaN(T_est, n_X);
+            for t = 1:T_est
+                X_t(t, :) = reshape(mean(X_tmp(t, :, :), 2), [1, n_X]);
+            end
             P0     = eye(T_est) - X_t*pinv((X_t')*X_t)*(X_t');
             Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
             b_var  = pinv(XX)*Xv_var*pinv(XX);
@@ -592,7 +596,11 @@ parfor i_MC = 1:n_MC
             SE_LP_proj_par(h+1, 5) = sqrt(max(0, b_var(1)));
             df_LP_proj_par(h+1, 5) = Inf;
         else
-            X_t    = reshape( mean(reshape(X, [T_est, N, n_X]), 2), [T_est, n_X]);
+            X_tmp  = permute(reshape(X, [T_est, N, n_X]), [2, 3, 1]);
+            X_t    = NaN(T_est, n_X);
+            for t = 1:T_est
+                X_t(t, :) = (s_sim')\X_tmp(:, :, t);
+            end
             P0     = eye(T_est) - X_t*pinv((X_t')*X_t)*(X_t');
             Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
             b_var  = pinv(XX)*Xv_var*pinv(XX);
@@ -712,7 +720,11 @@ parfor i_MC = 1:n_MC
             SE_LPIV_mean_par(h+1, 5) = sqrt(max(0, b_var(1)));
             df_LPIV_mean_par(h+1, 5) = Inf;
         else
-            X_t    = reshape( mean(reshape(X, [T_est, N, n_X]), 2), [T_est, n_X]);
+            X_tmp  = reshape(X, [T_est, N, n_X]);
+            X_t    = NaN(T_est, n_X);
+            for t = 1:T_est
+                X_t(t, :) = reshape(mean(X_tmp(t, :, :), 2), [1, n_X]);
+            end
             P0     = eye(T_est) - X_t*pinv((X_t')*X_t)*(X_t');
             Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
             b_var  = pinv(XX)*Xv_var*pinv(XX);
@@ -848,7 +860,11 @@ parfor i_MC = 1:n_MC
             SE_LPIV_proj_par(h+1, 5) = sqrt(max(0, b_var(1)));
             df_LPIV_proj_par(h+1, 5) = Inf;
         else
-            X_t    = reshape( mean(reshape(X, [T_est, N, n_X]), 2), [T_est, n_X]);
+            X_tmp  = permute(reshape(X, [T_est, N, n_X]), [2, 3, 1]);
+            X_t    = NaN(T_est, n_X);
+            for t = 1:T_est
+                X_t(t, :) = (s_sim')\X_tmp(:, :, t);
+            end
             P0     = eye(T_est) - X_t*pinv((X_t')*X_t)*(X_t');
             Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
             b_var  = pinv(XX)*Xv_var*pinv(XX);
