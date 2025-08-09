@@ -11,15 +11,16 @@ function LP_out = panel_LP(model)
 %
 % INPUT:
 %   model : Structure containing the following fields:
-%       - y            : (N_OBS x 1) Regressand vector.
-%       - sX           : (N_OBS x S) Shock variable(s) matrix potentially interacted with heterogeneous characteristics.
-%       - W            : (N_OBS x W, optional) Control variables matrix.
+%       - y            : (N_OBS x 1)   Regressand vector.
+%       - s            : (N_OBS x N_S) Individual characteristics matrix to be interacted with shocks. Defaults to a vector of ones.
+%       - X            : (N_OBS x N_X) Shock variable(s) matrix.
+%       - W            : (N_OBS x N_W, optional) Control variables matrix.
 %       - FE           : (N_OBS x G, optional) Fixed effects categorical matrix.
 %       - i_index      : (N_OBS x 1) Individual identifiers.
 %       - t_index      : (N_OBS x 1) Time period identifiers.
 %       - H            : (scalar, optional) Maximum horizon. Default: ceil(0.25*T).
 %       - p_max        : (scalar, optional) Maximum number of lags. Default: ceil((T-H)^(1/3)).
-%       - small_sample : (logical, optional) Apply small-sample refinement. Default: true.
+%       - small_sample : (logical, optional) Apply small-sample refinement. Default: false.
 %       - cumulative   : (logical, optional) Compute cumulative responses. Default: false.
 %
 % OUTPUT:
@@ -51,7 +52,8 @@ function LP_out = panel_LP(model)
 
 % Extract inputs
 y       = model.y;
-sX      = model.sX;
+if isfield(model, 's'); s = model.s; else, s = ones(size(y, 1), 1); end
+X       = model.X;
 i_index = model.i_index;
 t_index = model.t_index;
 
@@ -66,14 +68,18 @@ t_index = (t_index - t_min)/t_diff + 1;
 % Drop units with inconsistent time indexes
 keep    = ~(t_index - floor(t_index) > 1e-2);
 y       = y(keep);
-sX      = sX(keep, :);
+s       = s(keep, :);
+X       = X(keep, :);
 i_index = i_index(keep);
 t_index = round(t_index(keep));
 
 % Recover dimensions
 n_obs = length(t_index);
 T_eff = length(unique(t_index));
-n_s   = size(sX, 2);
+n_s   = size(s, 2)*size(X, 2);
+
+% Construct interacted regressor
+sX = reshape( repmat(s, [1, 1, size(X, 2)]) .* permute(repmat(X, [1, 1, size(s, 2)]), [1, 3, 2]), [n_obs, n_s]);
 
 % Recover optional data
 if isfield(model, 'W')  && ~isempty(model.W),  W  = model.W(keep, :);  else, W  = zeros(n_obs, 0); end
@@ -82,13 +88,13 @@ if isfield(model, 'FE') && ~isempty(model.FE), FE = model.FE(keep, :); else, FE 
 % Recover optional arguments
 if isfield(model, 'H'),            H            = model.H;            else, H            = ceil(0.25*T_eff);      end
 if isfield(model, 'p_max'),        p_max        = model.p_max;        else, p_max        = ceil((T_eff-H)^(1/3)); end
-if isfield(model, 'small_sample'), small_sample = model.small_sample; else, small_sample = true;                  end
+if isfield(model, 'small_sample'), small_sample = model.small_sample; else, small_sample = false;                 end
 if isfield(model, 'cumulative'),   cumulative   = model.cumulative;   else, cumulative   = false;                 end
 
 % Preallocate output
 LP_estimate = zeros(H+1, n_s);
 LP_SE       = zeros(H+1, n_s);
-LP_df       = zeros(H+1, 1);
+LP_df       = zeros(H+1, n_s);
 LP_CI90     = zeros(H+1, n_s, 2);
 LP_CI95     = zeros(H+1, n_s, 2);
 LP_CI99     = zeros(H+1, n_s, 2);
@@ -144,23 +150,26 @@ for h = 0:H
     % Compute t-LAHR standard error
     if (small_sample == true)
 
-        % Compute Imbens-Kolesar small-sample refinement
-        X_t    = zeros(T, n_X);
-        for t = 1:T
-            t_tmp     = (t_LP == t_set(t));
-            X_t(t, :) = sum(X_LP(t_tmp, :), 1);
-        end
-        P0     = eye(T) - X_t*pinv((X_t')*X_t)*(X_t');
-        Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
-        b_var  = pinv(XX)*Xv_var*pinv(XX);
-        G0     = zeros(T);
-        XX0    = pinv((X_t')*X_t);
-        for t = 1:T, G0(:, t) = P0(:, t)*X_t(t, :)*XX0(:, 1)/sqrt(P0(t, t)); end
-        lam0   = eig(G0'*G0);
+        for i_s = 1:n_s
+            % Compute Imbens-Kolesar small-sample refinement
+            s_LP = s(d, i_s);
+            X_t  = zeros(T, n_X);
+            for t = 1:T
+                t_tmp     = (t_LP == t_set(t));
+                X_t(t, :) = s_LP(t_tmp, :)\X_LP(t_tmp, :);
+            end
+            P0     = eye(T) - X_t*pinv((X_t')*X_t)*(X_t');
+            Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
+            b_var  = pinv(XX)*Xv_var*pinv(XX);
+            G0     = zeros(T);
+            XX0    = pinv((X_t')*X_t);
+            for t = 1:T, G0(:, t) = P0(:, t)*X_t(t, :)*XX0(:, 1)/sqrt(P0(t, t)); end
+            lam0   = eig(G0'*G0);
 
-        % Store standard error and degrees of freedom
-        LP_SE(h+1, :) = sqrt(max(0, diag(b_var(1:n_s, 1:n_s))));
-        LP_df(h+1)    = (sum(lam0))^2/(sum(lam0.^2));
+            % Store standard error and degrees of freedom
+            LP_SE(h+1, i_s) = sqrt(max(0, diag(b_var(i_s, i_s))));
+            LP_df(h+1, i_s) = (sum(lam0))^2/(sum(lam0.^2));
+        end
 
     else
 
@@ -170,7 +179,7 @@ for h = 0:H
 
         % Store standard error and degrees of freedom
         LP_SE(h+1, :) = sqrt(max(0, diag(b_var(1:n_s, 1:n_s))));
-        LP_df(h+1)    = Inf;
+        LP_df(h+1, :) = Inf;
 
     end
 
