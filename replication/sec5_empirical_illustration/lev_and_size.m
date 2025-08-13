@@ -7,7 +7,7 @@
 % by M. Almuzara and V. Sancibrian.
 %
 % The code takes as input a csv-file created by combining Compustat and CRSP 
-% data with other sources following Ottonello and Winberry (2020, ECTA).
+% data with other sources following Ottonello and Winberry (2020, ECTA). 
 % It creates output directories for figures and matfiles.
 %
 % Version: 2024 June 10 - Matlab R2022a
@@ -78,9 +78,9 @@ gold           = [218, 165,  32]/255;
 green          = [ 50, 205,  50]/255;
 font_square    = {'fontname', 'helvetica', 'fontsize', 40};
 font_rectangle = {'fontname', 'helvetica', 'fontsize', 34};
-fig_square     = {'units', 'inches', 'position', [0 0 14 14], ...
+fig_square     = {'theme', 'light', 'units', 'inches', 'position', [0 0 14 14], ...
                   'paperunits', 'inches', 'papersize', [14 14], 'paperposition', [0 0 14 14]};
-fig_rectangle  = {'units', 'inches', 'position', [0 0 24 10], ...
+fig_rectangle  = {'theme', 'light', 'units', 'inches', 'position', [0 0 24 10], ...
                   'paperunits', 'inches', 'papersize', [24 10], 'paperposition', [0 0 24 10]};
 
 
@@ -416,20 +416,23 @@ for h = 0:H
     XX    = (X_LP')*X_LP;
 
     % Compute t-LAHR standard error
-    X_t    = zeros(T, n_X);
-    for t = 1:T
-        t_tmp     = (t_LP == t_set(t));
-        X_t(t, :) = sum(X_LP(t_tmp, :), 1);
+    for i_s = 1:n_s
+        s_LP = s(d, i_s);
+        X_t    = zeros(T, n_X);
+        for t = 1:T
+            t_tmp     = (t_LP == t_set(t));
+            X_t(t, :) = s_LP(t_tmp, :)\X_LP(t_tmp, :);
+        end
+        P0     = eye(T) - X_t*pinv((X_t')*X_t)*(X_t');
+        Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
+        b_var  = pinv(XX)*Xv_var*pinv(XX);
+        SE_data(h+1, 5, i_s) = sqrt(max(0, diag(b_var(i_s, i_s))));
+        G0     = zeros(T);
+        XX0    = pinv((X_t')*X_t);
+        for t = 1:T, G0(:, t) = P0(:, t)*X_t(t, :)*XX0(:, 1)/sqrt(P0(t, t)); end
+        lam0   = eig(G0'*G0);
+        df_data(h+1, 5, i_s) = (sum(lam0))^2/(sum(lam0.^2));
     end
-    P0     = eye(T) - X_t*pinv((X_t')*X_t)*(X_t');
-    Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
-    b_var  = pinv(XX)*Xv_var*pinv(XX);
-    SE_data(h+1, 5, :) = sqrt(max(0, diag(b_var(1:n_s, 1:n_s))));
-    G0     = zeros(T);
-    XX0    = pinv((X_t')*X_t);
-    for t = 1:T, G0(:, t) = P0(:, t)*X_t(t, :)*XX0(:, 1)/sqrt(P0(t, t)); end
-    lam0   = eig(G0'*G0);
-    df_data(h+1, 5, :) = (sum(lam0))^2/(sum(lam0.^2));
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     fprintf('Panel data LP and CI     - Horizon %2d/%d - %4.1f seconds\n', h, H, cputime-tic_aux)    
