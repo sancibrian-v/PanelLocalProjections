@@ -27,7 +27,7 @@ function LP_out = panel_LP(model)
 %   LP_out : Structure containing the following fields:
 %       - estimate : ((H+1) x S) Matrix of LP estimates for each horizon.
 %       - SE       : ((H+1) x S) Standard errors.
-%       - df       : ((H+1) x 1) Degrees of freedom for inference.
+%       - df       : ((H+1) x N_S) Degrees of freedom for inference (one per s-component; IK refinement gives component-specific values).
 %       - CI90     : ((H+1) x S x 2) 90% confidence intervals.
 %       - CI95     : ((H+1) x S x 2) 95% confidence intervals.
 %       - CI99     : ((H+1) x S x 2) 99% confidence intervals.
@@ -76,7 +76,7 @@ t_index = round(t_index(keep));
 % Recover dimensions
 n_obs = length(t_index);
 T_eff = length(unique(t_index));
-n_s   = size(s, 2)*size(X, 2);
+n_s   = size(s, 2)*size(X, 2); 
 
 % Construct interacted regressor
 sX = reshape( repmat(s, [1, 1, size(X, 2)]) .* permute(repmat(X, [1, 1, size(s, 2)]), [1, 3, 2]), [n_obs, n_s]);
@@ -154,9 +154,20 @@ for h = 0:H
             % Compute Imbens-Kolesar small-sample refinement
             s_LP = s(d, i_s);
             X_t  = zeros(T, n_X);
+            ss_t = zeros(T, 1);                       % per-period s'*s denominator
             for t = 1:T
                 t_tmp     = (t_LP == t_set(t));
-                X_t(t, :) = s_LP(t_tmp, :)\X_LP(t_tmp, :);
+                ss_t(t)   = s_LP(t_tmp)'*s_LP(t_tmp);
+                X_t(t, :) = (s_LP(t_tmp)'*X_LP(t_tmp, :)) / ss_t(t); % ill-conditioning checked below
+            end
+            warn_if_illconditioned_ik(ss_t, X_t, h, i_s);
+            % A truly-degenerate period (s'*s = 0) makes X_t non-finite. Set df/SE to
+            % NaN for this cell and skip so a single degenerate period does not abort the
+            % run (rather than being silently reported as SE = 0).
+            if (~all(isfinite(X_t(:))))
+                LP_SE(h+1, i_s) = NaN;
+                LP_df(h+1, i_s) = NaN;
+                continue
             end
             P0     = eye(T) - X_t*pinv((X_t')*X_t)*(X_t');
             Xv_var = ((Xv_t./sqrt(diag(P0)))')*(Xv_t./sqrt(diag(P0)));
@@ -183,19 +194,20 @@ for h = 0:H
 
     end
 
-    % Compute confidence intervals
-    cv_tmp             = tinv(1-(1-0.90)/2, LP_df(h+1));
-    LP_CI90(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);     
-    LP_CI90(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);     
-    cv_tmp             = tinv(1-(1-0.95)/2, LP_df(h+1));
-    LP_CI95(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);     
-    LP_CI95(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);     
-    cv_tmp             = tinv(1-(1-0.99)/2, LP_df(h+1));
-    LP_CI99(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);     
-    LP_CI99(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);    
+    % Compute confidence intervals (LP_df(h+1, :) is a 1×n_s row vector;
+    % tinv broadcasts element-wise so each s-component uses its own df)
+    cv_tmp             = tinv(1-(1-0.90)/2, LP_df(h+1, :));
+    LP_CI90(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);
+    LP_CI90(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);
+    cv_tmp             = tinv(1-(1-0.95)/2, LP_df(h+1, :));
+    LP_CI95(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);
+    LP_CI95(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);
+    cv_tmp             = tinv(1-(1-0.99)/2, LP_df(h+1, :));
+    LP_CI99(h+1, :, 1) = LP_estimate(h+1, :) - cv_tmp .* LP_SE(h+1, :);
+    LP_CI99(h+1, :, 2) = LP_estimate(h+1, :) + cv_tmp .* LP_SE(h+1, :);
 
     % Compute p-values of two-sided significance test
-    LP_pval(h+1, :) = 2*(1-tcdf(abs(LP_estimate(h+1, :) ./ LP_SE(h+1, :)), LP_df(h+1)));
+    LP_pval(h+1, :) = 2*(1-tcdf(abs(LP_estimate(h+1, :) ./ LP_SE(h+1, :)), LP_df(h+1, :)));
 
 end
 
@@ -318,6 +330,24 @@ if ~converged
     warning('Fixed effects did not converge after %d iterations.', max_iter);
 end
 
+% Singularity safeguard: emit a STRONG warning when the residualized design matrix
+% is severely ill-conditioned -- i.e. a regressor is (near-)collinear with the
+% others, so the specification is effectively unidentified. At high condition
+% numbers the OLS coefficient estimates are numerically unreliable. cond() is the
+% 2-norm condition number. Detect-and-report only: it does not alter the numerics
+% and is a no-op on well-conditioned specs.
+if (n_X > 0)
+    kappa_X = cond(X_resid);
+    if kappa_X > 1e5
+        warning(['SINGULARITY SAFEGUARD: the design matrix is severely ill-conditioned ' ...
+                 '(condition number = %.3g > 1e5). One or more regressors are nearly ' ...
+                 'collinear with the rest, so the specification is effectively ' ...
+                 'unidentified: the OLS coefficient estimates are numerically unreliable. ' ...
+                 'Check the specification for a redundant or near-duplicate control / ' ...
+                 'interaction term.'], kappa_X);
+    end
+end
+
 % Run OLS on residualized data
 if (n_X > 0)
     b = X_resid\y_resid;
@@ -325,4 +355,42 @@ else
     b = [];
 end
 
+end
+
+% Helper: warn_if_illconditioned_ik
+% IK small-sample (X_t) ill-conditioning detector. WARNs that a specification is
+% ill-conditioned rather than silently rounding it off with a numerical floor.
+% Fires on EITHER trigger, per (h, s-component):
+%   (1) a within-period instrument sum-of-squares s'*s below ss_tol (where the
+%       per-period projection denominator is ~0 -- the projection is ~0/0); or
+%   (2) the 2-norm condition number of the IK design X_t exceeding kappa_max.
+% DETECT-ONLY; never alters the numerics.
+function warn_if_illconditioned_ik(ss_t, X_t, h, i_s, ss_tol, kappa_max)
+    if (nargin < 5 || isempty(ss_tol)),    ss_tol    = 1e-12; end
+    if (nargin < 6 || isempty(kappa_max)), kappa_max = 1e8;   end
+
+    ss_min = min(ss_t);
+    if (~isfinite(ss_min) || ss_min < ss_tol)
+        warning('panelLP:IKillConditioned', ...
+            ['ILL-CONDITIONED IK SPEC (h=%d, s-component %d): a within-period instrument ' ...
+             'sum-of-squares s''s = %.3g fell below tolerance %.0g. The per-period projection ' ...
+             'denominator is ~0, so the small-sample (X_t) refinement is unstable and the df/SE ' ...
+             'for this cell are unreliable. Consider rescaling the instrument or dropping the ' ...
+             'degenerate period.'], ...
+            h, i_s, ss_min, ss_tol);
+    end
+
+    if (all(isfinite(X_t(:))))
+        kappa_X = cond(X_t);
+    else
+        kappa_X = Inf;
+    end
+    if (kappa_X > kappa_max)
+        warning('panelLP:IKillConditioned', ...
+            ['ILL-CONDITIONED IK SPEC (h=%d, s-component %d): the small-sample design matrix X_t ' ...
+             'is severely ill-conditioned (condition number = %.3g > %.0g). The Imbens-Kolesar ' ...
+             'degrees-of-freedom estimate is numerically unstable; treat the small-sample ' ...
+             'inference for this cell with caution.'], ...
+            h, i_s, kappa_X, kappa_max);
+    end
 end

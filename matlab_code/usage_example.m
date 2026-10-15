@@ -20,7 +20,7 @@ X       = X(:);
 s       = repmat(1 + randn(N, 1), [1, T]);
 s       = s(:);
 b_true  = 1;
-y       = (s .* X) * b_true + reshape(randn(N, 1).*randn(1, T), [N*T, 1]) + randn(N*T, 1);
+y       = (s .* X) * b_true + reshape((0.5*s(1:N) + rand(N, 1)).*randn(1, T), [N*T, 1]) + randn(N*T, 1);
 t_index = repmat((1:T), [N, 1]);
 t_index = t_index(:);
 i_index = repmat((1:N)', [1, T]);
@@ -37,7 +37,7 @@ model.W            = [];                 % this may be omitted if no controls ar
 model.FE           = [i_index, t_index]; % unit and time fixed effects, may be omitted if no fixed effects are to be used
 model.H            = 5;                  % impulse response horizon
 model.p_max        = 0;                  % number of lags of regressand and shock to be added as controls
-model.small_sample = false;              % Imbens-Kolesar-2016-REStat small sample refinement; defaults to false
+model.small_sample = true;               % Imbens-Kolesar-2016-REStat small sample refinement; defaults to false
 model.cumulative   = true;               % Report cumulative impulse responses; default to false
 
 % Call panel local projections function
